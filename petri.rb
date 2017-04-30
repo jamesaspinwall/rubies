@@ -1,6 +1,8 @@
-class X
-  def initialize(arr)
-    @arr = arr
+module DataFlow
+  attr_accessor :arr, :base, :associated
+
+  def initialize
+    @arr = []
     @base = 0
     @associated = []
   end
@@ -14,6 +16,8 @@ class X
           @base |= (2 ** pos(s))
         end
     end
+  rescue => e
+    raise e
   end
 
   def reset(sym=nil)
@@ -27,20 +31,51 @@ class X
       when NilClass
         @base = 0
     end
+  rescue => e
+    raise e
   end
 
-  def associate(syms, meth)
-    @associated << [syms, meth]
+  def associate(syms, meth=:junkie)
+    if self.respond_to?(meth)
+      case syms
+        when Symbol
+          @arr << syms unless @arr.include?(syms)
+          @associated << [[syms], meth]
+        when Array
+          syms.map { |sym| @arr << sym unless @arr.include?(sym) }
+          @associated << [syms, meth]
+        when NilClass
+        else
+          raise 'Error'
+      end
+    else
+      if syms.is_a? Array
+        syms.each do |s, m|
+          associate(m, s)
+        end
+      end
+    end
+  rescue => e
+    raise e
   end
 
   def fire
-    to_be_fired = @associated.select { |assoc| get(assoc[0]) }
-    while not to_be_fired.empty? do
-      to_be_fired.map do |vars, meth|
-        send(meth, *vars)
-        reset(vars)
+    fired = []
+    size = @associated.size
+    i=0
+    while i < size
+      if get(@associated[i][0]) # if the inputs satisfies
+        fired << @associated[i][1] #fire
+        send(@associated[i][1])
+        reset(@associated[i][0])
+        i=0 # restart scan
+      else
+        i += 1
       end
     end
+    fired
+  rescue => e
+    raise e
   end
 
   def get(sym=nil)
@@ -58,57 +93,141 @@ class X
         end
         ret
     end
+  rescue => e
+    raise e
   end
 
   def pos(sym)
-    (@arr.index(sym))
+    ret = (@arr.index(sym))
+    if ret.nil?
+      raise "#{sym} not found"
+    end
+    ret
+  rescue => e
+    raise e
   end
 
-  def p_ac(a, c)
-    puts "P_AC a:#{a} c:#{c}"
-    set(:b)
+end
+
+class X
+  include DataFlow
+
+  attr_accessor :data
+
+  def initialize
+    @data = []
+    super
   end
 
-  def p_a(a)
-    puts "P_A: a=#{a}"
+  def aa
+    @data << 'AA'
   end
 
-  def p_b(b)
-    puts "P_B: b=#{b}"
+  def bb
+    @data << 'BB'
+  end
+
+  def cd
+    puts "CD"
+    @data << 'CD'
   end
 end
 
-def main
-  x = X.new([:a, :b, :c, :d])
-  x.associate([:a, :c], :p_ac)
-  x.associate(:b, :p_b)
-  x.associate(:a, :p_a)
+class XX
+  include DataFlow
 
-  x.reset_all
+  attr_accessor :data
 
-  x.set([:a, :c])
-  puts x.get(:a) == true
-  x.reset(:a)
-  puts x.get(:a) == false
-#x.set(:b)
+  def initialize
+    @data = []
+    super
+  end
+
+  def aa
+    @data << 'AA'
+    set(:c)
+  end
+
+  def bb
+    @data << 'BB'
+    set(:d)
+  end
+
+  def cd
+    puts "CD"
+    @data << 'CD'
+  end
+end
+
+
+
+def test_2
+  x = XX.new
+  x.associate([:c, :d], :cd)
+  x.associate(:a, :aa)
+  x.associate(:b, :bb)
+  x.set([:b, :a])
+  assert [:aa, :bb, :cd], x.fire
+  assert [], x.fire
+  assert ['AA', 'BB', 'CD'], x.data
+end
+
+def test_1
+
+  x = X.new
+
+  x.associate([:a], :aa)
   x.set(:a)
-  puts '---------'
+  assert [:aa], x.fire
 
-  puts x.get(:a) == true
-  puts x.get(:b) == false
-  puts x.get(:c) == true
-  puts x.get(:d) == false
+  x.data = []
+  x.associate(:b, :bb)
+  assert [], x.fire
+  x.set(:b)
+  assert [:bb], x.fire
+  assert ['BB'], x.data
+  assert [], x.fire
+end
 
-  puts
-  puts x.get([:a, :c]) == true
-  puts x.get([:a, :d]) == false
-  puts x.get([:b, :d]) == false
+def test
+  x = X.new
 
-  puts x.fire #== [[[:a, :c], :p_ac], [:b, :p_b], [:a, :p_a]]
+  x.associate([:c, :d], :cd)
+  x.associate([:a], :aa)
+  x.set(:a)
+  assert [:aa], x.fire
+
+  x.data = []
+  x.associate(:b, :bb)
+  assert [], x.fire
+  x.set(:b)
+  assert [:bb], x.fire
+  assert ['BB'], x.data
+  assert [], x.fire
+
+  x.data = []
+  x.set([:a, :b])
+  assert [:aa, :bb], x.fire
+  assert [], x.fire
+  assert ['AA', 'BB'], x.data
+
+  x.data = []
+  x.set([:b, :a])
+  assert [:aa, :bb], x.fire
+  assert [], x.fire
+  assert ['AA', 'BB'], x.data
+
+  x.data = []
+  x.set(:c)
+  x.fire
+  assert [], x.data
+  x.set(:d)
+  x.fire
+  assert ['CD'], x.data
+
 
 end
 
-# tests
 def test_set
   x = X.new([:a, :b, :c, :d, :e])
 
@@ -148,9 +267,9 @@ def test_set
   assert x.get(:a), false
   assert x.get(:b), true
   x.reset
-  assert x.get(:a),false
-  assert x.get(:b),false
-  assert x.get,[]
+  assert x.get(:a), false
+  assert x.get(:b), false
+  assert x.get, []
 
 end
 
@@ -158,9 +277,11 @@ def assert(a, b)
   unless a == b
     puts "Error: #{a} != #{b}"
   else
-    puts "OK"
+    puts "OK #{a.inspect}"
   end
 end
 
-test_set
+test
+test_1
+test_2
 
