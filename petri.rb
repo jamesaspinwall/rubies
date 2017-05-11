@@ -2,7 +2,7 @@ module DataFlow
   attr_accessor :arr, :base, :associated
 
   def initialize
-    @arr = []
+    @syms = []
     @base = 0
     @associated = []
   end
@@ -35,25 +35,16 @@ module DataFlow
     raise e
   end
 
-  def associate(syms, meth=:junkie)
-    if self.respond_to?(meth)
-      case syms
-        when Symbol
-          @arr << syms unless @arr.include?(syms)
-          @associated << [[syms], meth]
-        when Array
-          syms.map { |sym| @arr << sym unless @arr.include?(sym) }
-          @associated << [syms, meth]
-        when NilClass
-        else
-          raise 'Error'
-      end
-    else
-      if syms.is_a? Array
-        syms.each do |s, m|
-          associate(m, s)
-        end
-      end
+  def associate(syms, meth=nil)
+    case syms
+      when String
+        @syms << syms
+        @associated << [[syms], meth]
+      when Array
+        syms.map {|sym| @syms << sym}
+        @associated << [syms, meth]
+      else
+        raise 'Error'
     end
   rescue => e
     raise e
@@ -88,7 +79,7 @@ module DataFlow
         end
       when NilClass
         ret = []
-        @arr.each_with_index do |sym, i|
+        @syms.each_with_index do |sym, i|
           ret << sym if @base & (2 ** i) > 0
         end
         ret
@@ -98,7 +89,7 @@ module DataFlow
   end
 
   def pos(sym)
-    ret = (@arr.index(sym))
+    ret = (@syms.index(sym))
     if ret.nil?
       raise "#{sym} not found"
     end
@@ -158,7 +149,6 @@ class XX
     @data << 'CD'
   end
 end
-
 
 
 def test_2
