@@ -2,17 +2,17 @@ module DataFlow
   attr_accessor :arr, :base, :associated
 
   def initialize
-    @syms = []
+    @labels = []
     @base = 0
-    @associated = []
+    @associations = []
   end
 
-  def set(sym)
-    case sym
+  def set(label)
+    case label
       when Symbol
-        @base |= (2 ** pos(sym))
+        @base |= (2 ** pos(label))
       when Array
-        sym.each do |s|
+        label.each do |s|
           @base |= (2 ** pos(s))
         end
     end
@@ -20,12 +20,12 @@ module DataFlow
     raise e
   end
 
-  def reset(sym=nil)
-    case sym
+  def reset(label=nil)
+    case label
       when Symbol
-        @base &= (~(2 ** pos(sym)))
+        @base &= (~(2 ** pos(label)))
       when Array
-        sym.each do |s|
+        label.each do |s|
           @base &= (~(2 ** pos(s)))
         end
       when NilClass
@@ -35,14 +35,14 @@ module DataFlow
     raise e
   end
 
-  def associate(syms, meth=nil)
-    case syms
+  def associate(labels, meth=nil)
+    case labels
       when String
-        @syms << syms
-        @associated << [[syms], meth]
+        @labels << labels
+        @associations << [[labels], meth]
       when Array
-        syms.map {|sym| @syms << sym}
-        @associated << [syms, meth]
+        labels.map {|label| @labels << label}
+        @associations << [labels, meth]
       else
         raise 'Error'
     end
@@ -52,13 +52,13 @@ module DataFlow
 
   def fire
     fired = []
-    size = @associated.size
+    size = @associations.size
     i=0
     while i < size
-      if get(@associated[i][0]) # if the inputs satisfies
-        fired << @associated[i][1] #fire
-        send(@associated[i][1])
-        reset(@associated[i][0])
+      if get(@associations[i][0]) # if the inputs satisfies
+        fired << @associations[i][1] #fire
+        send(@associations[i][1])
+        reset(@associations[i][0])
         i=0 # restart scan
       else
         i += 1
@@ -69,18 +69,18 @@ module DataFlow
     raise e
   end
 
-  def get(sym=nil)
-    case sym
+  def get(label=nil)
+    case label
       when Symbol
-        @base & (2 ** pos(sym)) > 0
+        @base & (2 ** pos(label)) > 0
       when Array
-        sym.all? do |s|
+        label.all? do |s|
           @base & (2 ** pos(s)) > 0
         end
       when NilClass
         ret = []
-        @syms.each_with_index do |sym, i|
-          ret << sym if @base & (2 ** i) > 0
+        @labels.each_with_index do |label, i|
+          ret << label if @base & (2 ** i) > 0
         end
         ret
     end
@@ -88,10 +88,10 @@ module DataFlow
     raise e
   end
 
-  def pos(sym)
-    ret = (@syms.index(sym))
+  def pos(label)
+    ret = (@labels.index(label))
     if ret.nil?
-      raise "#{sym} not found"
+      raise "#{label} not found"
     end
     ret
   rescue => e
