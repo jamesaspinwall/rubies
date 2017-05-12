@@ -46,12 +46,13 @@ def test_ass
   assert :abc, x.to_fun(['b','c','a'])
 end
 
-def test
+def test_mark
   x = X.new
   x.associate('a', :a)
   x.associate('c', :c)
   x.associate('b', :b)
   x.associate(['c','a'],:ac)
+
   x.mark('a', 66)
   x.mark('c',88)
   assert 66, x.data[0]
@@ -59,6 +60,7 @@ def test
   assert x.to_bin('a'), x.network & x.to_bin('a')
   assert 0, x.network & x.to_bin('b')
   assert x.to_bin('c'), x.network & x.to_bin('c')
+
   x.mark('b', 77)
   assert 77, x.data[2]
   assert x.to_bin('a'), x.network & x.to_bin('a')
@@ -69,6 +71,7 @@ def test
   assert 0, x.network & x.to_bin('a')
   assert x.to_bin('b'), x.network & x.to_bin('b')
   assert x.to_bin('c'), x.network & x.to_bin('c')
+
   x.unmark('a')
   assert 0, x.network & x.to_bin('a')
   assert x.to_bin('b'), x.network & x.to_bin('b')
@@ -77,6 +80,44 @@ def test
   x.unmark('b')
   assert x.to_bin('c'), x.network & x.to_bin('c')
   assert 0, x.network & x.to_bin('b')
+
+end
+
+def test
+  x = X.new
+  x.associate('a', :a)
+  x.associate('b', :b)
+  x.associate('c', :c)
+
+  x.mark('a',123)
+  assert 1, x.network
+  assert [:a], x.fire
+  assert 0, x.network
+
+  x.mark('b',123)
+  assert 2, x.network
+  assert [:b], x.fire
+  assert 0, x.network
+
+
+  x.mark('c',123)
+  assert 4, x.network
+  assert [:c], x.fire
+  assert 0, x.network
+
+  x.mark('a',123)
+  x.mark('b',123)
+
+  assert 3, x.network
+  assert [:b,:a].sort, x.fire.sort
+  assert 0, x.network
+
+
+  x.mark('c',123)
+  x.mark('b',123)
+  assert 6, x.network
+  assert [:c,:b].sort, x.fire.sort
+  assert 0, x.network
 
 end
 
@@ -137,6 +178,37 @@ module DataFlow
 
   end
 
+  def fire
+    to_run = []
+    @associations.each do |association|
+      if (@network & association) == association
+        pos = @associations.index(association)
+        to_run << @meths[pos]
+        @network &=  ~association
+      end
+    end
+    to_run
+  end
+
+  def fire_old
+    fired = []
+    size = @associations.size
+    i=0
+    while i < size
+      if get(@associations[i][0]) # if the inputs satisfies
+        fired << @associations[i][1] #fire
+        send(@associations[i][1])
+        reset(@associations[i][0])
+        i=0 # restart scan
+      else
+        i += 1
+      end
+    end
+    fired
+  rescue => e
+    raise e
+  end
+
   def set(label)
     case label
       when Symbol
@@ -162,25 +234,6 @@ module DataFlow
       when NilClass
         @base = 0
     end
-  rescue => e
-    raise e
-  end
-
-  def fire
-    fired = []
-    size = @associations.size
-    i=0
-    while i < size
-      if get(@associations[i][0]) # if the inputs satisfies
-        fired << @associations[i][1] #fire
-        send(@associations[i][1])
-        reset(@associations[i][0])
-        i=0 # restart scan
-      else
-        i += 1
-      end
-    end
-    fired
   rescue => e
     raise e
   end
