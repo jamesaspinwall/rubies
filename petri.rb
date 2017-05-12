@@ -1,10 +1,140 @@
+def test_to_bin
+  x = X.new
+  assert 1, x.to_bin('a')
+  assert 2, x.to_bin('b')
+  assert 4, x.to_bin('c')
+  assert 1, x.to_bin('a')
+  assert 2, x.to_bin('b')
+  assert 4, x.to_bin('c')
+  assert 24, x.to_bin(['d','e'])
+  assert 3,x.to_bin(['a','b'])
+  assert 6, x.to_bin(['b','c'])
+  assert 7, x.to_bin(['c','a','b'])
+  assert 7, x.to_bin(['c','b','a'])
+end
+
+def test_ass
+  x = X.new
+  x.associate('a', :a)
+  assert 'a', x.labels[0]
+  assert 1, x.associations[0]
+  assert :a, x.meths[0]
+  assert :a, x.to_fun('a')
+
+  x.associate('b', :b)
+  assert 'b', x.labels[1]
+  assert 2, x.associations[1]
+  assert :b, x.meths[1]
+  assert :a, x.to_fun('a')
+  assert :b, x.to_fun('b')
+
+
+  x.associate(['c', 'd'], :cd)
+  assert 'c', x.labels[2]
+  assert 'd', x.labels[3]
+  assert 12, x.associations[2]
+  assert :cd, x.to_fun(['d','c'])
+
+  x.associate(['a','c'], :b)
+  assert 5, x.associations[3]
+  assert :b, x.meths[3]
+  assert :b, x.to_fun(['c','a'])
+
+  x.associate(['a','c','b'], :abc)
+  assert 5, x.associations[3]
+  assert :abc, x.meths[4]
+  assert :abc, x.to_fun(['b','c','a'])
+end
+
+def test
+  x = X.new
+  x.associate('a', :a)
+  x.associate('c', :c)
+  x.associate('b', :b)
+  x.associate(['c','a'],:ac)
+  x.mark('a', 66)
+  x.mark('c',88)
+  assert 66, x.data[0]
+  assert 88,x.data[1]
+  assert x.to_bin('a'), x.network & x.to_bin('a')
+  assert 0, x.network & x.to_bin('b')
+  assert x.to_bin('c'), x.network & x.to_bin('c')
+  x.mark('b', 77)
+  assert 77, x.data[2]
+  assert x.to_bin('a'), x.network & x.to_bin('a')
+  assert x.to_bin('b'), x.network & x.to_bin('b')
+  assert x.to_bin('c'), x.network & x.to_bin('c')
+
+  x.unmark('a')
+  assert 0, x.network & x.to_bin('a')
+  assert x.to_bin('b'), x.network & x.to_bin('b')
+  assert x.to_bin('c'), x.network & x.to_bin('c')
+  x.unmark('a')
+  assert 0, x.network & x.to_bin('a')
+  assert x.to_bin('b'), x.network & x.to_bin('b')
+  assert x.to_bin('c'), x.network & x.to_bin('c')
+
+  x.unmark('b')
+  assert x.to_bin('c'), x.network & x.to_bin('c')
+  assert 0, x.network & x.to_bin('b')
+
+end
+
 module DataFlow
-  attr_accessor :arr, :base, :associated
+  attr_accessor :labels, :base, :associations, :meths, :network
 
   def initialize
     @labels = []
     @base = 0
     @associations = []
+    @meths = []
+    @network = 0
+
+  end
+
+  def to_fun(label)
+    bin = to_bin(label)
+    pos = @associations.index(bin)
+    @meths[pos]
+  end
+
+  def to_bin(label)
+    case label
+      when Array
+        compose =0
+        label.each do |label|
+          compose |= to_bin(label)
+        end
+        compose
+      when String
+        pos = @labels.index(label)
+        if pos.nil?
+          pos = @labels.length
+          @labels << label
+        end
+        1 << pos
+    end
+
+  end
+
+
+  def associate(label, meth=nil)
+    @associations << to_bin(label)
+    @meths << meth
+  rescue => e
+    raise e
+  end
+
+  def mark(label,data)
+    pos =  @labels.index label
+    @data[pos] = data
+    @network |= to_bin(label)
+  end
+
+  def unmark(label)
+    pos =  @labels.index label
+    @network &=  ~to_bin(label)
+
   end
 
   def set(label)
@@ -20,6 +150,7 @@ module DataFlow
     raise e
   end
 
+
   def reset(label=nil)
     case label
       when Symbol
@@ -30,21 +161,6 @@ module DataFlow
         end
       when NilClass
         @base = 0
-    end
-  rescue => e
-    raise e
-  end
-
-  def associate(labels, meth=nil)
-    case labels
-      when String
-        @labels << labels
-        @associations << [[labels], meth]
-      when Array
-        labels.map {|label| @labels << label}
-        @associations << [labels, meth]
-      else
-        raise 'Error'
     end
   rescue => e
     raise e
@@ -124,6 +240,7 @@ class X
   end
 end
 
+
 class XX
   include DataFlow
 
@@ -179,7 +296,7 @@ def test_1
   assert [], x.fire
 end
 
-def test
+def test_22
   x = X.new
 
   x.associate([:c, :d], :cd)
@@ -272,6 +389,6 @@ def assert(a, b)
 end
 
 test
-test_1
-test_2
+#test_1
+#test_2
 
