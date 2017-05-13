@@ -88,36 +88,45 @@ def test
   x.associate('a', :a)
   x.associate('b', :b)
   x.associate('c', :c)
+  x.associate(['a','c'], :ac)
+  x.associate('a',:aa)
+  x.associate(['b','c'], :bc)
 
-  x.mark('a',123)
+  x.mark('a','aaa')
   assert 1, x.network
-  assert [:a], x.fire
+  assert [[:a, ["aaa"]], [:aa, ["aaa"]]], x.fire
   assert 0, x.network
 
-  x.mark('b',123)
+  x.mark('b','bbb')
   assert 2, x.network
-  assert [:b], x.fire
+  assert [[:b, ["bbb"]]], x.fire
   assert 0, x.network
 
-
-  x.mark('c',123)
+  x.mark('c','ccc')
   assert 4, x.network
-  assert [:c], x.fire
+  assert [[:c, ["ccc"]]], x.fire
   assert 0, x.network
 
-  x.mark('a',123)
-  x.mark('b',123)
+  x.mark('a','aaa')
+  x.mark('b','bbb')
 
   assert 3, x.network
-  assert [:b,:a].sort, x.fire.sort
-  assert 0, x.network
+  ret = x.fire
+  assert [[:a, ["aaa"]], [:b, ["bbb"]], [:aa, ["aaa"]]], ret
+  x.network = 0
 
 
-  x.mark('c',123)
-  x.mark('b',123)
+  x.mark('c','ccc')
+  x.mark('b','bbb')
   assert 6, x.network
-  assert [:c,:b].sort, x.fire.sort
-  assert 0, x.network
+  assert [[:b, ["bbb"]], [:c, ["ccc"]]], x.fire.sort
+  x.network = 0
+
+  x.mark('a','aaa')
+  x.mark('c','ccc')
+  assert 5, x.network
+  assert [[:a, ["aaa"]], [:ac, ["aaa", "ccc"]], [:c, ["ccc"]]], x.fire.sort
+  x.network = 0
 
 end
 
@@ -180,13 +189,28 @@ module DataFlow
 
   def fire
     to_run = []
+    new_network = @network
+    pos = 0
     @associations.each do |association|
       if (@network & association) == association
-        pos = @associations.index(association)
-        to_run << @meths[pos]
-        @network &=  ~association
+        new_network &=  ~association
+        i = 0
+        to_data = []
+        @labels.length.times do
+          if (association & 1) == 1
+            to_data << @data[i]
+          end
+          i += 1
+          association >>= 1
+        end
+        to_run << [@meths[pos], to_data]
       end
+      pos += 1
     end
+    to_run.each do |fun, data|
+      send(fun, *data)
+    end
+    @network = new_network
     to_run
   end
 
@@ -279,17 +303,28 @@ class X
     super
   end
 
-  def aa
-    @data << 'AA'
+  def a(data)
+    puts "a: #{data}"
   end
 
-  def bb
-    @data << 'BB'
+  def aa(data)
+    puts "aa: #{data}"
   end
 
-  def cd
-    puts "CD"
-    @data << 'CD'
+  def b(data)
+    puts data
+  end
+
+  def c(data)
+    puts data
+  end
+
+  def ac(a,c)
+    puts "ac: #{a} #{c}"
+  end
+
+  def bc(b,c)
+    puts "bc: #{b}, #{c}"
   end
 end
 
@@ -314,9 +349,8 @@ class XX
     set(:d)
   end
 
-  def cd
-    puts "CD"
-    @data << 'CD'
+  def ac(a,c)
+    puts "#{a} #{c}"
   end
 end
 
