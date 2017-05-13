@@ -119,13 +119,13 @@ def test
   x.mark('c','ccc')
   x.mark('b','bbb')
   assert 6, x.network
-  assert [[:b, ["bbb"]], [:c, ["ccc"]]], x.fire.sort
+  assert [[:b, ["bbb"]], [:bc, ["bbb", "ccc"]], [:c, ["ccc"]]], x.fire.sort
   x.network = 0
 
   x.mark('a','aaa')
   x.mark('c','ccc')
   assert 5, x.network
-  assert [[:a, ["aaa"]], [:ac, ["aaa", "ccc"]], [:c, ["ccc"]]], x.fire.sort
+  assert [[:a, ["aaa"]], [:aa, ["aaa"]], [:ac, ["aaa", "ccc"]], [:c, ["ccc"]]], x.fire.sort
   x.network = 0
 
 end
@@ -287,8 +287,6 @@ module DataFlow
       raise "#{label} not found"
     end
     ret
-  rescue => e
-    raise e
   end
 
 end
